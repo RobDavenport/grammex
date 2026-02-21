@@ -10,6 +10,11 @@ const NODE_COLORS = {
     key:      '#f1c40f',
     boss:     '#9b59b6',
     treasure: '#e67e22',
+    exit:     '#ecf0f1',
+    objective:'#27ae60',
+    task:     '#3498db',
+    reward:   '#f1c40f',
+    prereq:   '#e74c3c',
 };
 
 const NODE_RADIUS = 18;
@@ -81,6 +86,7 @@ function render() {
 
     // Draw nodes
     for (const node of graphData.nodes) {
+        if (!node) continue;
         const color = NODE_COLORS[node.kind] || '#888';
         ctx.beginPath();
         ctx.arc(node.x, node.y, NODE_RADIUS, 0, Math.PI * 2);
@@ -91,7 +97,7 @@ function render() {
         ctx.stroke();
 
         // Label
-        ctx.fillStyle = '#fff';
+        ctx.fillStyle = node.kind === 'key' ? '#333' : '#fff';
         ctx.font = '11px sans-serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
@@ -147,26 +153,6 @@ function drawArrow(ctx, x1, y1, x2, y2) {
     ctx.fill();
 }
 
-// ---------- Force-Directed Layout (placeholder) ----------
-
-function layoutGraph() {
-    const w = canvas.clientWidth;
-    const h = canvas.clientHeight;
-    const n = graphData.nodes.length;
-    if (n === 0) return;
-
-    // Simple circular layout as placeholder
-    const cx = w / 2;
-    const cy = h / 2;
-    const radius = Math.min(w, h) * 0.35;
-
-    for (let i = 0; i < n; i++) {
-        const angle = (2 * Math.PI * i) / n - Math.PI / 2;
-        graphData.nodes[i].x = cx + radius * Math.cos(angle);
-        graphData.nodes[i].y = cy + radius * Math.sin(angle);
-    }
-}
-
 // ---------- Placeholder Data Generation ----------
 
 function generatePlaceholder() {
@@ -174,26 +160,34 @@ function generatePlaceholder() {
     const mode = document.getElementById('mode').value;
     const maxSteps = parseInt(document.getElementById('max-steps').value) || 100;
 
-    // Simple procedural placeholder based on seed
     const rng = mulberry32(seed);
     const nodeCount = 5 + Math.floor(rng() * Math.min(maxSteps / 10, 15));
     const kinds = mode === 'quest'
-        ? ['start', 'task', 'reward', 'boss']
+        ? ['objective', 'task', 'reward', 'prereq']
         : ['entrance', 'room', 'key', 'lock', 'boss', 'treasure'];
 
+    const w = canvas.clientWidth;
+    const h = canvas.clientHeight;
+    const cx = w / 2;
+    const cy = h / 2;
+    const radius = Math.min(w, h) * 0.35;
+
     const nodes = [];
-    nodes.push({ kind: kinds[0], label: kinds[0] });
-    for (let i = 1; i < nodeCount; i++) {
-        const kind = kinds[1 + Math.floor(rng() * (kinds.length - 1))];
-        nodes.push({ kind, label: kind });
+    for (let i = 0; i < nodeCount; i++) {
+        const kind = i === 0 ? kinds[0] : kinds[1 + Math.floor(rng() * (kinds.length - 1))];
+        const angle = (2 * Math.PI * i) / nodeCount - Math.PI / 2;
+        nodes.push({
+            kind,
+            label: kind,
+            x: cx + radius * Math.cos(angle),
+            y: cy + radius * Math.sin(angle),
+        });
     }
 
     const edges = [];
-    // Ensure connectivity: chain
     for (let i = 1; i < nodeCount; i++) {
         edges.push({ source: i - 1, target: i });
     }
-    // Add some random edges
     const extraEdges = Math.floor(rng() * nodeCount * 0.5);
     for (let i = 0; i < extraEdges; i++) {
         const s = Math.floor(rng() * nodeCount);
@@ -208,13 +202,10 @@ function generatePlaceholder() {
         edges: edges.length,
         steps: Math.floor(rng() * maxSteps),
         rules: Math.floor(rng() * maxSteps * 0.7),
-        cycles: edges.length - nodeCount + 1,
+        cycles: Math.max(0, edges.length - nodeCount + 1),
     };
-
-    layoutGraph();
 }
 
-// Simple seeded PRNG
 function mulberry32(a) {
     return function() {
         let t = a += 0x6D2B79F5;
@@ -224,60 +215,101 @@ function mulberry32(a) {
     };
 }
 
+// ---------- Config ----------
+
+function getConfig() {
+    return {
+        seed: parseInt(document.getElementById('seed').value) || 0,
+        mode: document.getElementById('mode').value,
+        max_steps: parseInt(document.getElementById('max-steps').value) || 100,
+        strategy: document.getElementById('strategy').value,
+        lock_key: document.getElementById('lock-key').checked,
+        reachability: document.getElementById('reachability').checked,
+        acyclic: document.getElementById('acyclic').checked,
+    };
+}
+
 // ---------- Actions ----------
 
 function doGenerate() {
     stopAuto();
+    stepRewriter = null;
 
     if (wasm) {
-        const config = JSON.stringify({
-            seed: parseInt(document.getElementById('seed').value) || 0,
-            mode: document.getElementById('mode').value,
-            max_steps: parseInt(document.getElementById('max-steps').value) || 100,
-            strategy: document.getElementById('strategy').value,
-        });
-        const result = wasm.generate_demo(config);
-        const parsed = JSON.parse(result);
-        if (parsed.status === 'not_implemented') {
-            generatePlaceholder();
-            showMessage('Using placeholder (WASM not yet implemented).', 'info');
-        } else {
+        try {
+            const config = JSON.stringify(getConfig());
+            const result = wasm.generate_demo(config);
+            const parsed = JSON.parse(result);
             graphData = parsed;
-            layoutGraph();
+            stats = {
+                nodes: parsed.nodes.length,
+                edges: parsed.edges.length,
+                steps: 0,
+                rules: 0,
+                cycles: Math.max(0, parsed.edges.length - parsed.nodes.length + 1),
+            };
+            showMessage(`Generated: ${parsed.nodes.length} nodes, ${parsed.edges.length} edges`, 'success');
+        } catch (e) {
+            console.error('Generation error:', e);
+            generatePlaceholder();
+            showMessage('WASM error. Using placeholder.', 'error');
         }
     } else {
         generatePlaceholder();
-        showMessage('Using placeholder data.', 'info');
+        showMessage('Using placeholder data (WASM not loaded).', 'info');
     }
     render();
 }
 
 function doStep() {
-    if (!stepRewriter && wasm) {
-        const config = JSON.stringify({
-            seed: parseInt(document.getElementById('seed').value) || 0,
-            mode: document.getElementById('mode').value,
-        });
-        try {
-            stepRewriter = new wasm.StepRewriter(config);
-        } catch (e) {
-            showMessage('Step rewriter not available.', 'error');
+    if (!stepRewriter) {
+        if (wasm) {
+            try {
+                const config = JSON.stringify(getConfig());
+                stepRewriter = new wasm.StepRewriter(config);
+                stats = { nodes: 1, edges: 0, steps: 0, rules: 0, cycles: 0 };
+            } catch (e) {
+                showMessage('Error creating step rewriter: ' + e.message, 'error');
+                return;
+            }
+        } else {
+            showMessage('WASM not loaded. Use Generate for placeholder.', 'info');
             return;
         }
     }
 
-    if (stepRewriter) {
-        const event = JSON.parse(stepRewriter.step());
-        if (event.type === 'not_implemented') {
-            showMessage('Step not yet implemented in WASM.', 'info');
+    try {
+        const eventStr = stepRewriter.step();
+        const event = JSON.parse(eventStr);
+
+        // Update graph display
+        const graphStr = stepRewriter.graph_json();
+        graphData = JSON.parse(graphStr);
+
+        // Update stats from event
+        if (event.type === 'applied') {
+            stats.steps++;
+            stats.rules++;
+            stats.nodes = event.nodes || graphData.nodes.length;
+            stats.edges = event.edges || graphData.edges.length;
+            showMessage(`Applied rule: ${event.rule}`, 'success');
+        } else if (event.type === 'constraint_violated') {
+            stats.steps++;
+            showMessage(`Constraint violated: ${event.rule} (rolled back)`, 'info');
+        } else if (event.type === 'no_match' || event.type === 'complete') {
+            stopAuto();
+            stats.nodes = event.nodes || graphData.nodes.length;
+            stats.edges = event.edges || graphData.edges.length;
+            showMessage(`Complete: ${stats.nodes} nodes, ${stats.edges} edges, ${event.steps || stats.steps} steps`, 'success');
         }
-        const json = JSON.parse(stepRewriter.graph_json());
-        graphData = json;
-        layoutGraph();
-        stats.steps++;
-    } else {
-        showMessage('WASM not loaded. Use Generate for placeholder.', 'info');
+
+        stats.cycles = Math.max(0, stats.edges - stats.nodes + 1);
+    } catch (e) {
+        console.error('Step error:', e);
+        showMessage('Step error: ' + e.message, 'error');
+        stopAuto();
     }
+
     render();
 }
 
