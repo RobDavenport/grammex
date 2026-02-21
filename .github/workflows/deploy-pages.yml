@@ -1,0 +1,73 @@
+name: Deploy Demo to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Cache cargo registry and build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: wasm-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: wasm-
+
+      - name: Install wasm-pack
+        uses: jetli/wasm-pack-action@v0.4.0
+        with:
+          version: 'v0.13.1'
+
+      - name: Build WASM
+        run: wasm-pack build demo-wasm --target web --release
+
+      - name: Assemble site
+        run: |
+          mkdir -p _site/pkg
+          cp demo-wasm/www/index.html _site/
+          cp demo-wasm/www/style.css  _site/
+          cp demo-wasm/www/main.js    _site/
+          cp demo-wasm/pkg/grammex_demo.js      _site/pkg/
+          cp demo-wasm/pkg/grammex_demo_bg.wasm _site/pkg/
+          touch _site/.nojekyll
+
+      - name: Validate site
+        run: bash demo-wasm/scripts/validate-site.sh _site
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

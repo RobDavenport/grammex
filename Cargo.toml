@@ -1,0 +1,29 @@
+[workspace]
+members = ["demo-wasm"]
+resolver = "3"
+
+[package]
+name = "grammex"
+version = "0.1.0"
+edition = "2024"
+description = "A generic graph rewriting engine with game-constraint semantics for procedural generation"
+license = "MIT OR Apache-2.0"
+
+[lib]
+name = "grammex"
+path = "src/lib.rs"
+
+[features]
+default = []
+std = []
+
+[dependencies]
+rand_core = { version = "0.6", default-features = false }
+
+[dev-dependencies]
+rand = "0.8"
+criterion = { version = "0.5", features = ["html_reports"] }
+
+[[bench]]
+name = "matching"
+harness = false

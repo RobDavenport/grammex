@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>grammex - Graph Grammar Dungeon Generator</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header>
+        <h1>grammex</h1>
+        <p class="subtitle">Graph Grammar Dungeon Generator</p>
+    </header>
+
+    <main>
+        <aside class="controls">
+            <!-- Mode -->
+            <div class="control-group">
+                <label for="mode">Grammar Mode</label>
+                <select id="mode">
+                    <option value="dungeon">Dungeon Grammar</option>
+                    <option value="quest">Quest Grammar</option>
+                </select>
+            </div>
+
+            <!-- Strategy -->
+            <div class="control-group">
+                <label for="strategy">Selection Strategy</label>
+                <select id="strategy">
+                    <option value="weighted">Weighted Random</option>
+                    <option value="first">First Match</option>
+                    <option value="parallel">Parallel (Markov Jr.)</option>
+                </select>
+            </div>
+
+            <!-- Max Steps -->
+            <div class="control-group">
+                <label for="max-steps">Max Steps</label>
+                <input type="number" id="max-steps" value="100" min="1" max="10000" step="10">
+            </div>
+
+            <!-- Seed -->
+            <div class="control-group">
+                <label for="seed">Seed</label>
+                <div class="seed-row">
+                    <input type="number" id="seed" value="42" min="0" max="4294967295">
+                    <button id="btn-random-seed" title="Random seed">Rand</button>
+                </div>
+            </div>
+
+            <!-- Constraints -->
+            <div class="control-group">
+                <label>Constraints</label>
+                <div class="control-group checkbox-group">
+                    <input type="checkbox" id="lock-key" checked>
+                    <label for="lock-key">Lock-and-Key</label>
+                </div>
+                <div class="control-group checkbox-group">
+                    <input type="checkbox" id="reachability" checked>
+                    <label for="reachability">Reachability</label>
+                </div>
+                <div class="control-group checkbox-group">
+                    <input type="checkbox" id="acyclic">
+                    <label for="acyclic">Acyclic (DAG)</label>
+                </div>
+            </div>
+
+            <!-- Speed -->
+            <div class="control-group">
+                <label for="speed">Auto-play Speed</label>
+                <div class="speed-row">
+                    <input type="range" id="speed" min="1" max="60" value="10">
+                    <span id="speed-label">10 steps/s</span>
+                </div>
+            </div>
+
+            <!-- Buttons -->
+            <div class="buttons">
+                <button id="btn-generate" class="primary">Generate</button>
+                <button id="btn-step">Step</button>
+                <button id="btn-auto">Auto-play</button>
+                <button id="btn-reset">Reset</button>
+            </div>
+
+            <!-- Message -->
+            <div id="message" class="message info hidden"></div>
+
+            <!-- Stats -->
+            <div class="control-group">
+                <label>Statistics</label>
+                <div class="stats">
+                    <div class="stat-row">
+                        <span class="stat-label">Nodes</span>
+                        <span class="stat-value" id="stat-nodes">0</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Edges</span>
+                        <span class="stat-value" id="stat-edges">0</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Steps</span>
+                        <span class="stat-value" id="stat-steps">0</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Rules Applied</span>
+                        <span class="stat-value" id="stat-rules">0</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Cycles</span>
+                        <span class="stat-value" id="stat-cycles">0</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Legend -->
+            <div class="legend">
+                <h3>Node Types</h3>
+                <div class="legend-item"><span class="swatch" style="background:#27ae60"></span> Entrance</div>
+                <div class="legend-item"><span class="swatch" style="background:#3498db"></span> Room</div>
+                <div class="legend-item"><span class="swatch" style="background:#e74c3c"></span> Lock</div>
+                <div class="legend-item"><span class="swatch" style="background:#f1c40f"></span> Key</div>
+                <div class="legend-item"><span class="swatch" style="background:#9b59b6"></span> Boss</div>
+                <div class="legend-item"><span class="swatch" style="background:#e67e22"></span> Treasure</div>
+            </div>
+
+            <!-- How It Works -->
+            <details class="how-it-works">
+                <summary>How It Works</summary>
+                <div id="how-it-works-content">
+                    <p>
+                        <strong>grammex</strong> generates dungeon layouts using
+                        <em>graph grammar rewriting</em>. Starting from a seed graph
+                        (an entrance node), the engine repeatedly applies transformation
+                        rules that replace subgraph patterns with more complex structures.
+                    </p>
+                    <h4>Rules</h4>
+                    <p>
+                        Each rule has a <em>left-hand side</em> (LHS) pattern to match and
+                        a <em>right-hand side</em> (RHS) replacement. For example, a rule
+                        might replace a single room node with a room connected to a key and
+                        a locked door.
+                    </p>
+                    <h4>Constraints</h4>
+                    <p>
+                        After each rule application, structural constraints are verified.
+                        If a constraint is violated, the application is rolled back and a
+                        different match is tried. This guarantees the generated dungeon is
+                        always completable.
+                    </p>
+                </div>
+            </details>
+        </aside>
+
+        <div class="canvas-container">
+            <canvas id="canvas" width="800" height="600"></canvas>
+        </div>
+    </main>
+
+    <footer>
+        <a href="https://github.com/robdavenport/grammex" target="_blank">GitHub</a>
+        &middot; Built with Rust + WebAssembly
+    </footer>
+
+    <script type="module" src="main.js"></script>
+</body>
+</html>
