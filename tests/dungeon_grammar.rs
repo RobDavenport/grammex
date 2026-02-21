@@ -179,7 +179,7 @@ fn boss_to_exit_rule() -> Rule<DNode, DEdge> {
         ],
     };
 
-    Rule { lhs, rhs, weight: 2, name: "boss_to_exit" }
+    Rule { lhs, rhs, weight: 20, name: "boss_to_exit" }
 }
 
 fn build_dungeon_rewriter(seed: u64) -> (grammex::rewriter::Rewriter<DNode, DEdge>, impl rand_core::RngCore) {
@@ -187,7 +187,7 @@ fn build_dungeon_rewriter(seed: u64) -> (grammex::rewriter::Rewriter<DNode, DEdg
     let start = g.add_node(DNode::Start);
 
     let config = RewriterConfig::new()
-        .max_steps(50)
+        .max_steps(100)
         .selection(SelectionStrategy::WeightedRandom);
 
     let mut rewriter = grammex::rewriter::Rewriter::new(g, config);
@@ -200,7 +200,7 @@ fn build_dungeon_rewriter(seed: u64) -> (grammex::rewriter::Rewriter<DNode, DEdg
     // Add reachability: Exit must be reachable from Start
     rewriter.add_constraint(ReachabilityConstraint::new(
         start,
-        vec![DKind::Start],
+        vec![DKind::Exit],
     ));
 
     // Add lock-key constraint
@@ -224,6 +224,12 @@ fn dungeon_grammar_produces_valid_graph() {
     });
     assert!(has_start, "Graph must have a Start node");
 
+    // Should have an Exit node
+    let has_exit = result.graph.node_ids().any(|id| {
+        result.graph.node(id).unwrap().kind() == DKind::Exit
+    });
+    assert!(has_exit, "Graph must have an Exit node");
+
     // Should have applied at least one rule
     assert!(result.steps > 0, "Should have applied at least one rule");
 
@@ -233,7 +239,7 @@ fn dungeon_grammar_produces_valid_graph() {
 
 #[test]
 fn dungeon_grammar_multiple_seeds() {
-    for seed in 0..20 {
+    for seed in 0..100 {
         let (rewriter, mut rng) = build_dungeon_rewriter(seed);
         let result = rewriter.rewrite(&mut rng).unwrap();
 
@@ -241,6 +247,12 @@ fn dungeon_grammar_multiple_seeds() {
             result.graph.node_count() > 1,
             "Seed {seed}: graph should have expanded"
         );
+
+        // Verify Exit node exists
+        let has_exit = result.graph.node_ids().any(|id| {
+            result.graph.node(id).unwrap().kind() == DKind::Exit
+        });
+        assert!(has_exit, "Seed {seed}: graph must have an Exit node");
 
         // Verify lock-key constraint: every Lock should have a Key in the graph
         let has_lock = result.graph.node_ids().any(|id| {

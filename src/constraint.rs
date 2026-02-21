@@ -136,8 +136,15 @@ impl<N: NodeData, E: EdgeData> StructuralConstraint<N, E> for ReachabilityConstr
             }
         }
 
-        // Check all required kinds are found among visited nodes
+        // Check all required kinds are found among visited nodes.
+        // If no node of a required kind exists in the graph yet, skip it (vacuous truth).
         for required in &self.required_kinds {
+            let exists_in_graph = graph.node_ids().any(|nid| {
+                graph.node(nid).map(|n| n.kind() == *required).unwrap_or(false)
+            });
+            if !exists_in_graph {
+                continue;
+            }
             let found = visited.iter().any(|&nid| {
                 graph.node(nid).map(|n| n.kind() == *required).unwrap_or(false)
             });

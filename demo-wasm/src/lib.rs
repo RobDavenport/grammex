@@ -475,7 +475,7 @@ pub fn generate_demo(config_json: &str) -> String {
         if cfg.reachability {
             rewriter.add_constraint(ReachabilityConstraint::new(
                 start_node,
-                vec![DKind::Start],
+                vec![DKind::Exit],
             ));
         }
         if cfg.lock_key {
