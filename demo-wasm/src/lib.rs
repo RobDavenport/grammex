@@ -11,6 +11,7 @@ use rand::SeedableRng;
 enum DNode {
     Start,
     Room,
+    Corridor,
     Key,
     Lock,
     Boss,
@@ -27,6 +28,7 @@ enum DNode {
 enum DKind {
     Start,
     Room,
+    Corridor,
     Key,
     Lock,
     Boss,
@@ -44,6 +46,7 @@ impl NodeData for DNode {
         match self {
             DNode::Start => DKind::Start,
             DNode::Room => DKind::Room,
+            DNode::Corridor => DKind::Corridor,
             DNode::Key => DKind::Key,
             DNode::Lock => DKind::Lock,
             DNode::Boss => DKind::Boss,
@@ -60,8 +63,9 @@ impl NodeData for DNode {
 impl DKind {
     fn label(self) -> &'static str {
         match self {
-            DKind::Start => "entrance",
+            DKind::Start => "start",
             DKind::Room => "room",
+            DKind::Corridor => "corridor",
             DKind::Key => "key",
             DKind::Lock => "lock",
             DKind::Boss => "boss",
@@ -361,7 +365,7 @@ fn graph_to_json(graph: &Graph<DNode, DEdge>, width: f64, height: f64) -> String
             if !first { json.push(','); }
             first = false;
             json.push_str(&format!(
-                "{{\"source\":{},\"target\":{}}}",
+                "{{\"source\":{},\"target\":{},\"kind\":\"connection\"}}",
                 // Map NodeIds to index in node_ids array for JS rendering
                 node_ids.iter().position(|&n| n == src).unwrap_or(0),
                 node_ids.iter().position(|&n| n == tgt).unwrap_or(0)
@@ -441,6 +445,17 @@ fn selection_from_str(s: &str) -> SelectionStrategy {
 }
 
 // --- WASM exports ---
+
+/// Generate a dungeon graph with the given seed and max_steps. Returns graph JSON.
+/// Convenience wrapper matching the spec signature.
+#[wasm_bindgen]
+pub fn generate_dungeon(seed: u32, max_steps: u32) -> String {
+    let config = format!(
+        "{{\"seed\":{},\"mode\":\"dungeon\",\"max_steps\":{},\"strategy\":\"weighted\",\"lock_key\":true,\"reachability\":true,\"acyclic\":false}}",
+        seed, max_steps
+    );
+    generate_demo(&config)
+}
 
 /// Generate a complete dungeon/quest graph and return JSON.
 #[wasm_bindgen]
@@ -577,6 +592,12 @@ impl StepRewriter {
             );
         }
 
+        // Capture node/edge IDs before step
+        let nodes_before: std::collections::HashSet<usize> =
+            self.inner.graph().node_ids().map(|n| n.0).collect();
+        let edges_before: std::collections::HashSet<usize> =
+            self.inner.graph().edge_ids().map(|e| e.0).collect();
+
         self.steps += 1;
 
         // Use observer to track what happens
@@ -594,9 +615,26 @@ impl StepRewriter {
                 } else {
                     self.rules_applied += 1;
                     let g = self.inner.graph();
+
+                    // Compute added node/edge IDs
+                    let nodes_added: Vec<usize> = g.node_ids()
+                        .map(|n| n.0)
+                        .filter(|id| !nodes_before.contains(id))
+                        .collect();
+                    let edges_added: Vec<usize> = g.edge_ids()
+                        .map(|e| e.0)
+                        .filter(|id| !edges_before.contains(id))
+                        .collect();
+
+                    // Format arrays as JSON
+                    let nodes_json: String = format!("[{}]",
+                        nodes_added.iter().map(|id| format!("{}", id)).collect::<Vec<_>>().join(","));
+                    let edges_json: String = format!("[{}]",
+                        edges_added.iter().map(|id| format!("{}", id)).collect::<Vec<_>>().join(","));
+
                     format!(
-                        "{{\"type\":\"applied\",\"rule\":\"{}\",\"nodes\":{},\"edges\":{}}}",
-                        rule_name, g.node_count(), g.edge_count()
+                        "{{\"type\":\"applied\",\"rule\":\"{}\",\"nodes_added\":{},\"edges_added\":{}}}",
+                        rule_name, nodes_json, edges_json
                     )
                 }
             }

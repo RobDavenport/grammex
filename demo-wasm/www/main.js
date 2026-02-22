@@ -4,8 +4,9 @@
 let wasm = null;
 
 const NODE_COLORS = {
-    entrance: '#27ae60',
+    start:    '#27ae60',
     room:     '#3498db',
+    corridor: '#2c3e50',
     lock:     '#e74c3c',
     key:      '#f1c40f',
     boss:     '#9b59b6',
@@ -164,7 +165,7 @@ function generatePlaceholder() {
     const nodeCount = 5 + Math.floor(rng() * Math.min(maxSteps / 10, 15));
     const kinds = mode === 'quest'
         ? ['objective', 'task', 'reward', 'prereq']
-        : ['entrance', 'room', 'key', 'lock', 'boss', 'treasure'];
+        : ['start', 'room', 'corridor', 'key', 'lock', 'boss', 'treasure'];
 
     const w = canvas.clientWidth;
     const h = canvas.clientHeight;
@@ -290,9 +291,10 @@ function doStep() {
         if (event.type === 'applied') {
             stats.steps++;
             stats.rules++;
-            stats.nodes = event.nodes || graphData.nodes.length;
-            stats.edges = event.edges || graphData.edges.length;
-            showMessage(`Applied rule: ${event.rule}`, 'success');
+            stats.nodes = graphData.nodes.length;
+            stats.edges = graphData.edges.length;
+            const added = event.nodes_added ? ` (+${event.nodes_added.length} nodes, +${event.edges_added.length} edges)` : '';
+            showMessage(`Applied rule: ${event.rule}${added}`, 'success');
         } else if (event.type === 'constraint_violated') {
             stats.steps++;
             showMessage(`Constraint violated: ${event.rule} (rolled back)`, 'info');

@@ -5,9 +5,11 @@ use grammex::*;
 // --- Node types ---
 
 #[derive(Clone, PartialEq, Eq, Debug)]
+#[allow(dead_code)]
 enum DNode {
     Start,
     Room,
+    Corridor,
     Key,
     Lock,
     Boss,
@@ -20,6 +22,7 @@ impl NodeData for DNode {
         match self {
             DNode::Start => DKind::Start,
             DNode::Room => DKind::Room,
+            DNode::Corridor => DKind::Corridor,
             DNode::Key => DKind::Key,
             DNode::Lock => DKind::Lock,
             DNode::Boss => DKind::Boss,
@@ -32,6 +35,7 @@ impl NodeData for DNode {
 enum DKind {
     Start,
     Room,
+    Corridor,
     Key,
     Lock,
     Boss,
